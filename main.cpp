@@ -50,13 +50,13 @@ void readFile(string path) {
 				for(int j = 0; j<3; j++) triplets.pop_back() ;
 			}
 		}
-	} else cout << "OUPS" << endl ;
+	} else cout << "Erreur lors de la lecture du fichier obj" << endl ;
 }
 
-
-void line(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, TGAColor color){
+void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2){
 	float t, y ;
 	int z ;
+	TGAColor color(0,1) ;
 	bool pentu = false ;
 	if((pentu = abs(y2-y1)>abs(x2-x1))){
 		swap(x1,y1) ;
@@ -66,6 +66,7 @@ void line(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, TGACo
 		swap(x1,x2) ;
 		swap(y1,y2) ;
 		swap(z1,z2) ;
+		swap(color2,color1) ;
 	}
 
 	for(int x=x1; x<=x2; x++){
@@ -73,6 +74,7 @@ void line(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, TGACo
 		y = (1-t)*y1 + t*y2 ;
 		z = (1-t)*z1 + t*z2 ;
 
+		color.val = (1-t)*color1.val + t*color2.val ;
 		if(pentu){
 			if(x>0 && y>0 && x<taille && y<taille && zbuffer[(int)y][x] < z){
 				zbuffer[(int)y][x] = z ;
@@ -89,22 +91,25 @@ void line(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, TGACo
 	}
 }
 
-void triangle(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, int x3, int y3, int z3, TGAColor color){
+void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2, int x3, int y3, int z3, TGAColor color3){
 	float y_h, y_b,z_h, z_b,  t1, t2 ;
 	if (x2<x1){
 		swap(x2,x1) ;
 		swap(y2,y1) ;
 		swap(z2,z1) ;
+		swap(color2,color1) ;
 	}
 	if (x3<x1){
 		swap(x3,x1) ;
 		swap(y3,y1) ;
 		swap(z3,z1) ;
+		swap(color3,color1) ;
 	}
 	if (x3<x2){
 		swap(x3,x2) ;
 		swap(y3,y2) ;
 		swap(z3,z2) ;
+		swap(color3,color2) ;
 	}
 	for(int x = x1; x<x2; x++){
 		t1 = (x2==x1) ? 1 : (x-x1)/(float)(x2-x1) ;
@@ -114,7 +119,7 @@ void triangle(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, i
 		z_h = (1.-t1)*z1 + t1*z2 ;
 		z_b = (1.-t2)*z1 + t2*z3 ;
 
-		line(image, x,y_h,z_h, x,y_b,z_b, color) ;
+		line(image, x,y_h,z_h, TGAColor((1-t1)*color1.val+t1*color2.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
 	}
 	for(int x = x2; x<=x3; x++){
 		t1 = (x3==x2) ? 1 : (x-x2)/(float)(x3-x2) ;
@@ -124,7 +129,7 @@ void triangle(TGAImage &image, int x1, int y1, int z1, int x2, int y2, int z2, i
 		z_h = (1.-t1)*z2 + t1*z3 ;
 		z_b = (1.-t2)*z1 + t2*z3 ;
 
-		line(image, x,y_h,z_h, x,y_b,z_b, color) ;
+		line(image, x,y_h,z_h, TGAColor((1-t1)*color2.val+t1*color3.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
 	}
 }
 
@@ -157,7 +162,7 @@ int main(int argc, char** argv){
 	TGAImage im = TGAImage(w,w,1) ;
 	TGAColor blanc = TGAColor(255, 255, 255, 3) ;
 	Vec3f lum(0,0,1) ;
-	float x1,x2,x3,y1,y2,y3,z1,z2,z3, scalaire, zoom = w/2 ;
+	float x1,x2,x3,y1,y2,y3,z1,z2,z3, scalaire1,scalaire2,scalaire3,moyenne, zoom = w/2 ;
 	for(int i = 0; i<facets.size();i++){
 		// Zoom + Translation
 		x1 = zoom*(sommets[facets[i][0][0]-1][0]) + w/2 ;
@@ -169,28 +174,21 @@ int main(int argc, char** argv){
 		x3 = zoom*(sommets[facets[i][2][0]-1][0]) + w/2 ;
 		y3 = zoom*(sommets[facets[i][2][0]-1][1]) + w/2 ;
 		z3 = zoom*(sommets[facets[i][2][0]-1][2]) + w/2 ;
-		Vec3f a(x1,y1,z1) ;
-		Vec3f b(x2,y2,z2) ;
-		Vec3f c(x3,y3,z3) ;
-		Vec3f n = (a-b)^(a-c);
-		n = n.normalize() ;
-		scalaire = n*lum ;
-		// Affichage
-		if(scalaire > 0)
-			triangle(im, x1,y1,z1,x2,y2,z2,x3,y3,z3, TGAColor(scalaire*255, 1)) ;
+		Vec3f n1(normaux[facets[i][0][2]-1]) ;
+		Vec3f n2(normaux[facets[i][1][2]-1]) ;
+		Vec3f n3(normaux[facets[i][2][2]-1]) ;
+		n1 = n1.normalize() ;
+		n2 = n2.normalize() ;
+		n3 = n3.normalize() ;
+		//	Coloration
+		scalaire1 = min(max(lum * n1, 0.f), 1.f);
+		scalaire2 = min(max(lum * n2, 0.f), 1.f);
+		scalaire3 = min(max(lum * n3, 0.f), 1.f);
+		moyenne = (scalaire1+scalaire2+scalaire3)/3 ;
+		if(moyenne > 0)
+			 triangle(im, x1,y1,z1, TGAColor(scalaire1*255,1),x2,y2,z2, TGAColor(scalaire2*255,1),x3,y3,z3, TGAColor(scalaire3*255,1)) ;
 	}
 	im.flip_vertically() ;
-	im.write_tga_file("modele.tga") ;
-	
-	im.clear() ;
-	for(int i = 0; i<w; i++){
-		for(int j =0; j<w; j++){
-			int couleur = zbuffer[i][j]*255/maxi ;
-			im.set(i,j,TGAColor(couleur,1)) ;
-		}
-	}
-	
-	im.flip_vertically() ;
-	im.write_tga_file("zbuffer.tga") ;
+	im.write_tga_file("ombrage_lisse.tga") ;
 	return 0 ;
 }
