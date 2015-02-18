@@ -115,7 +115,21 @@ int main(int argc, char** argv){
 	int w = 1000 ;
 	TGAImage im = TGAImage(w,w,1) ;
 	TGAColor blanc = TGAColor(255, 255, 255, 3) ;
+	int x1,x2,x3,y1,y2,y3, zoom = w/2 ;
+	for(int i = 0; i<facets.size();i++){
+		// Zoom + Translation
+		x1 = zoom*(sommets[facets[i][0][0]-1][0])+w/2 ;
+		y1 = zoom*(sommets[facets[i][0][0]-1][1])+w/2 ;
+		x2 = zoom*(sommets[facets[i][1][0]-1][0])+w/2 ;
+		y2 = zoom*(sommets[facets[i][1][0]-1][1])+w/2 ;
+		x3 = zoom*(sommets[facets[i][2][0]-1][0])+w/2 ;
+		y3 = zoom*(sommets[facets[i][2][0]-1][1])+w/2 ;
+		// Affichage
+		line(im, x1,y1,x2,y2, blanc) ;
+		line(im, x1,y1,x3,y3, blanc) ;
+		line(im, x2,y2,x3,y3, blanc) ;
+	}
 	im.flip_vertically() ;
-	im.write_tga_file("im.tga") ;
+	im.write_tga_file("wire.tga") ;
 	return 0 ;
 }
