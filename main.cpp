@@ -2,55 +2,47 @@
 #include <cmath>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include "tgaimage.cpp"
+#include "geometrie.cpp"
 
 using namespace std;
 
-vector<vector<float> > sommets ;
-vector<vector<float> > textures ;
-vector<vector<float> > normaux  ;
-vector<vector<vector<int> > > facets  ;
+std::vector<Vec3f > sommets;
+std::vector<Vec3f > textures;
+std::vector<Vec3f > normaux;
+std::vector<std::vector<Vec3i> > facets;
 int ** zbuffer = NULL ; int maxi = 0 ;
 int taille = 0 ;
 
 void readFile(string path) {
 	ifstream fichier(path.c_str()) ;
 	if(fichier) {
-		string buff, flag;
-		vector<float> coords;
-		vector<vector<int> > triplets ;
-		vector<int> triplet ;
-		char * p ;
-		while(getline(fichier, buff)){
-			if(buff.length()<2) continue ;
-			flag = buff.substr(0,2) ;
-			buff = buff.substr(2);
-			if(flag.substr(0,1) == "v"){
-				coords.push_back(strtod(buff.c_str(), &p)) ;
-				coords.push_back(strtod(p, &p)) ;
-				coords.push_back(strtod(p, NULL)) ;
-				if(flag == "v ")	sommets.push_back(coords) ;
-				else if(flag == "vn")	normaux.push_back(coords) ;
-				else if(flag == "vt")	textures.push_back(coords) ;
-				for(int i = 0; i<3; i++) coords.pop_back() ;
-			} else if(flag == "f ") {
-				p = (char * )buff.c_str() ;
+        string buff, flag;
+        Vec3f coords;
+		vector<Vec3i> triplets(3) ;
+        char c ;
+        while(!fichier.eof()){
+            getline(fichier, buff) ;
+            if(buff.length()<2) continue ;
+            istringstream s(buff.c_str()) ;
+            s >> flag ;
+            if(flag.substr(0,1) == "v"){
+                s >> coords[0] >> coords[1] >> coords[2] ;
+				if(buff.substr(0,2) == "v ") sommets.push_back(coords) ;
+                else if(flag.substr(1,1) == "n")	normaux.push_back(coords) ;
+                else if(flag.substr(1,1) == "t")	textures.push_back(coords) ;
+            } else if(flag.substr(0,1) == "f") {
 				for(int i = 0; i<3; i++){
-					triplet.push_back(strtol(p, &p, 10)) ;
-					if(sizeof(p)>1) p = &p[1] ;
-					triplet.push_back(strtol(p, &p, 10)) ;
-					if(sizeof(p)>1) p = &p[1] ;
-					triplet.push_back(strtol(p, &p, 10)) ;
-					if(sizeof(p)>1) p = &p[1] ;
-					triplets.push_back(triplet) ;
-					for(int j = 0; j<3; j++) triplet.pop_back() ;
-				}
-				facets.push_back(triplets) ;
-				for(int j = 0; j<3; j++) triplets.pop_back() ;
-			}
+                    s >> buff ;
+                    istringstream s2(buff.c_str()) ;
+                    s2 >> triplets[i][0] >> c >> triplets[i][1] >> c >> triplets[i][2] ;
+                }
+                facets.push_back(triplets) ;
+            }
 		}
-	} else cout << "Erreur lors de la lecture du fichier obj" << endl ;
+    } else cout << "Erreur lors de la lecture du fichier obj" << endl ;
 }
 
 void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2){
@@ -132,23 +124,6 @@ void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, 
 		line(image, x,y_h,z_h, TGAColor((1-t1)*color2.val+t1*color3.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
 	}
 }
-
-struct Vec3f {
-  union {
-    struct {float x, y, z;};
-    float raw[3];
-  };
-  Vec3f() : x(0), y(0), z(0) {}
-  Vec3f(float _x, float _y, float _z) : x(_x),y(_y),z(_z) {}
-  Vec3f(vector<float> tab) : x(tab[0]),y(tab[1]),z(tab[2]) {}
-  Vec3f operator ^(const Vec3f &v) const { return Vec3f(y*v.z-z*v.y, z*v.x-x*v.z, x*v.y-y*v.x); }
-  Vec3f operator +(const Vec3f &v) const { return Vec3f(x+v.x, y+v.y, z+v.z); }
-  Vec3f operator -(const Vec3f &v) const { return Vec3f(x-v.x, y-v.y, z-v.z); }
-  Vec3f operator *(float f) const { return Vec3f(x*f, y*f, z*f); }
-  float operator *(const Vec3f &v) const { return x*v.x + y*v.y + z*v.z; }
-  float norm () const { return std::sqrt(x*x+y*y+z*z); }
-  Vec3f & normalize(float l=1) { *this = (*this)*(l/norm()); return *this; }
-};
 
 int main(int argc, char** argv){
 	readFile("obj/african_head.obj") ;
