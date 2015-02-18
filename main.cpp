@@ -21,7 +21,7 @@ Vec3f u = Vec3f(0,1,0) ;
 Matrix view, projection, changementBase, M, M_inv;
 float ** zbuffer = NULL ; int maxi = 0 ;
 const int w = 1000 ;
-TGAImage nm, diffuse ;
+TGAImage nm, diffuse, specular ;
 
 // PROTOTYPE
 void readFile(string path) ;
@@ -116,10 +116,14 @@ void line(TGAImage &image, int x1, int y1, int z1, Vec3f tex1, int x2, int y2, i
 		
 		TGAColor colorNm = nm.get(x_tex, y_tex) ;
 		TGAColor colorDiffuse = diffuse.get(x_tex, y_tex) ;
+		TGAColor colorSpec = specular.get(x_tex, y_tex) ;
 		Vec3f l = lumiere.normalize() ;
 		Vec3f n = proj<3>(M_inv*embed<4>(Vec3f(colorNm.r/255.f*2.f-1.f,colorNm.g/255.f*2.f-1.f,colorNm.b/255.f*2.f-1.f), 0.f)).normalize() ;
-		float diff = max(0.f,n*l) ;
-		color = colorDiffuse*diff+10;
+		Vec3f r = ((n*2.*(n*l))-l).normalize() ;
+		float s = std::max(0.f,r*cam.normalize()) ;
+		float diff = std::max(0.f,n*l) ;
+		float spe = std::sqrt(colorSpec.r*colorSpec.r+colorSpec.g*colorSpec.g+colorSpec.b*colorSpec.b) ;
+		color = colorDiffuse*(1.2*diff+.6*pow(s, spe+5));
 		
 		if(pentu){
 			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[(int)y][x] < z){
@@ -209,7 +213,7 @@ void createImage(){
 		triangle(im, P1, T1, P2, T2, P3, T3) ;
 	}
 	im.flip_vertically() ;
-	im.write_tga_file("relief.tga") ;
+	im.write_tga_file("shiny.tga") ;
 }
 
 int main(int argc, char** argv){
@@ -219,6 +223,8 @@ int main(int argc, char** argv){
 	nm.flip_vertically() ;
 	diffuse.read_tga_file((path.substr(0,path.length()-4)+"_diffuse.tga").c_str()) ;
 	diffuse.flip_vertically() ;
+	specular.read_tga_file((path.substr(0,path.length()-4)+"_spec.tga").c_str()) ;
+	specular.flip_vertically() ;
 	zbuffer = new float*[w] ;
 	viewport(0,0,w,w) ;
 	lookat(cam, u, center) ;
