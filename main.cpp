@@ -1,7 +1,55 @@
 #include <stdlib.h>
+#include <cmath>
+#include <string>
+#include <iostream>
+#include <vector>
 #include "tgaimage.cpp"
 
 using namespace std;
+
+vector<vector<float> > sommets ;
+vector<vector<float> > textures ;
+vector<vector<float> > normaux  ;
+vector<vector<vector<int> > > facets  ;
+
+void readFile(string path) {
+	ifstream fichier(path.c_str()) ;
+	if(fichier) {
+		string buff, flag;
+		vector<float> coords;
+		vector<vector<int> > triplets ;
+		vector<int> triplet ;
+		char * p ;
+		while(getline(fichier, buff)){
+			if(buff.length()<2) continue ;
+			flag = buff.substr(0,2) ;
+			buff = buff.substr(2);
+			if(flag.substr(0,1) == "v"){
+				coords.push_back(strtod(buff.c_str(), &p)) ;
+				coords.push_back(strtod(p, &p)) ;
+				coords.push_back(strtod(p, NULL)) ;
+				if(flag == "v ")	sommets.push_back(coords) ;
+				else if(flag == "vn")	normaux.push_back(coords) ;
+				else if(flag == "vt")	textures.push_back(coords) ;
+				for(int i = 0; i<3; i++) coords.pop_back() ;
+			} else if(flag == "f ") {
+				p = (char * )buff.c_str() ;
+				for(int i = 0; i<3; i++){
+					triplet.push_back(strtol(p, &p, 10)) ;
+					if(sizeof(p)>1) p = &p[1] ;
+					triplet.push_back(strtol(p, &p, 10)) ;
+					if(sizeof(p)>1) p = &p[1] ;
+					triplet.push_back(strtol(p, &p, 10)) ;
+					if(sizeof(p)>1) p = &p[1] ;
+					triplets.push_back(triplet) ;
+					for(int j = 0; j<3; j++) triplet.pop_back() ;
+				}
+				facets.push_back(triplets) ;
+				for(int j = 0; j<3; j++) triplets.pop_back() ;
+			}
+		}
+	} else cout << "OUPS" << endl ;
+}
 
 void line(TGAImage &image, int x1, int y1, int x2, int y2, TGAColor color){
 	float t, y ;
@@ -63,12 +111,10 @@ void triangle(TGAImage &image, int x1, int y1, int x2, int y2, int x3, int y3, T
 }
 
 int main(int argc, char** argv){
-	int w = 100 ;
+	readFile("obj/african_head.obj") ;
+	int w = 1000 ;
 	TGAImage im = TGAImage(w,w,1) ;
 	TGAColor blanc = TGAColor(255, 255, 255, 3) ;
-	triangle(im, 10, 10, 10, w-10, w-10, w/2, blanc) ;
-	triangle(im, 20, 10, w-10, 10, w-10, w/2-10, blanc) ;
-	triangle(im, 20, w-10, w-10, w-10, w-10, w/2+10, blanc) ;
 	im.flip_vertically() ;
 	im.write_tga_file("im.tga") ;
 	return 0 ;
