@@ -180,6 +180,17 @@ int main(int argc, char** argv){
 			triangle(im, x1,y1,z1,x2,y2,z2,x3,y3,z3, TGAColor(scalaire*255, 1)) ;
 	}
 	im.flip_vertically() ;
+	im.write_tga_file("modele.tga") ;
+	
+	im.clear() ;
+	for(int i = 0; i<w; i++){
+		for(int j =0; j<w; j++){
+			int couleur = zbuffer[i][j]*255/maxi ;
+			im.set(i,j,TGAColor(couleur,1)) ;
+		}
+	}
+	
+	im.flip_vertically() ;
 	im.write_tga_file("zbuffer.tga") ;
 	return 0 ;
 }
