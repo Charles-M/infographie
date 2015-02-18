@@ -15,12 +15,13 @@ std::vector<Vec3f > textures;
 std::vector<Vec3f > normaux;
 std::vector<std::vector<Vec3i> > facets;
 Vec3f lumiere = Vec3f(1,1,1) ;
-Vec3f cam = Vec3f(-1,1,4) ;
+Vec3f cam = Vec3f(0,0,5) ;
 Vec3f center = Vec3f(0,0,0) ;
 Vec3f u = Vec3f(0,1,0) ;
 Matrix view, projection, changementBase, M, M_inv;
 float ** zbuffer = NULL ; int maxi = 0 ;
 const int w = 1000 ;
+TGAImage nm ;
 
 // PROTOTYPE
 void readFile(string path) ;
@@ -90,10 +91,12 @@ void lookat(Vec3f eye, Vec3f up, Vec3f centre) {
 	}
 }
 
-void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2){
+void line(TGAImage &image, int x1, int y1, int z1, Vec3f tex1, int x2, int y2, int z2, Vec3f tex2){
 	float t, y, z ;
-	TGAColor color(0,1) ;
+    int x_tex, y_tex ;
 	bool pentu = false ;
+	TGAColor color ;
+	
 	if((pentu = abs(y2-y1)>abs(x2-x1))){
 		swap(x1,y1) ;
 		swap(x2,y2) ;
@@ -102,25 +105,28 @@ void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int 
 		swap(x1,x2) ;
 		swap(y1,y2) ;
 		swap(z1,z2) ;
-		swap(color2,color1) ;
+		swap(tex2,tex1) ;
 	}
-
 	for(int x=x1; x<=x2; x++){
 		t = (x2==x1) ? 1 : (x-x1)/(float)(x2-x1) ;
 		y = (1-t)*y1 + t*y2 ;
 		z = (1-t)*z1 + t*z2 ;
-		y = (y-int(y) >= 0.5) ? ceil(y) : floor(y) ;
-		z = (z-int(z) >= 0.5) ? ceil(z) : floor(z) ;
-
-		color.val = (1-t)*color1.val + t*color2.val ;
+		x_tex = ((1-t)*tex1[0] + t*tex2[0])*nm.get_width() ;
+		y_tex = ((1-t)*tex1[1] + t*tex2[1])*nm.get_height() ;
+		
+		TGAColor colorNm = nm.get(x_tex, y_tex) ;
+		Vec3f l = lumiere.normalize() ;
+		Vec3f n = proj<3>(M_inv*embed<4>(Vec3f(colorNm.r/255.f*2.f-1.f,colorNm.g/255.f*2.f-1.f,colorNm.b/255.f*2.f-1.f), 0.f)).normalize() ;
+		float diff = max(0.f,n*l) ;
+		color = TGAColor(255,1)*diff;
 		if(pentu){
-			if(x>0 && y>0 && x<w-1 && y<w-1 && zbuffer[(int)y][x] < z){
+			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[(int)y][x] < z){
 				zbuffer[(int)y][x] = z ;
 				if(maxi < z) maxi = z ;
 				image.set(y,x,color) ;
 			}
 		}else{
-			if(x>0 && y>0 && x<w-1 && y<w-1 && zbuffer[x][(int)y] < z){
+			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[x][(int)y] < z){
 				zbuffer[x][(int)y] = z ;
 				if(maxi < z) maxi = z ;
 				image.set(x,y,color) ;
@@ -129,53 +135,47 @@ void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int 
 	}
 }
 
-void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2, int x3, int y3, int z3, TGAColor color3){
+void triangle(TGAImage &image, Vec3i P1, Vec3f tex1, Vec3i P2, Vec3f tex2, Vec3i P3, Vec3f tex3){
 	float y_h, y_b,z_h, z_b,  t1, t2 ;
-	if (x2<x1){
-		swap(x2,x1) ;
-		swap(y2,y1) ;
-		swap(z2,z1) ;
-		swap(color2,color1) ;
+	if (P2[0]<P1[0]){
+		swap(P1,P2) ;
+		swap(tex2,tex1) ;
 	}
-	if (x3<x1){
-		swap(x3,x1) ;
-		swap(y3,y1) ;
-		swap(z3,z1) ;
-		swap(color3,color1) ;
+	if (P3[0]<P1[0]){
+		swap(P1, P3) ;
+		swap(tex3,tex1) ;
 	}
-	if (x3<x2){
-		swap(x3,x2) ;
-		swap(y3,y2) ;
-		swap(z3,z2) ;
-		swap(color3,color2) ;
+	if (P3[0]<P2[0]){
+		swap(P2, P3) ;
+		swap(tex3,tex2) ;
 	}
-	for(int x = x1; x<x2; x++){
-		t1 = (x2==x1) ? 1 : (x-x1)/(float)(x2-x1) ;
-		t2 = (x3==x1) ? 1 : (x-x1)/(float)(x3-x1) ;
-		y_h = (1.-t1)*y1 + t1*y2 ;
-		y_b = (1.-t2)*y1 + t2*y3 ;
+	for(int x = P1[0]; x<P2[0]; x++){
+		t1 = (P2[0]==P1[0]) ? 1 : (x-P1[0])/(float)(P2[0]-P1[0]) ;
+		t2 = (P3[0]==P1[0]) ? 1 : (x-P1[0])/(float)(P3[0]-P1[0]) ;
+		y_h = (1.-t1)*P1[1] + t1*P2[1] ;
+		y_b = (1.-t2)*P1[1] + t2*P3[1] ;
 		y_h = (y_h-int(y_h) >= 0.5) ? ceil(y_h) : floor(y_h) ;
 		y_b = (y_b-int(y_b) >= 0.5) ? ceil(y_b) : floor(y_b) ;
-		z_h = (1.-t1)*z1 + t1*z2 ;
-		z_b = (1.-t2)*z1 + t2*z3 ;
+		z_h = (1.-t1)*P1[2] + t1*P2[2] ;
+		z_b = (1.-t2)*P1[2] + t2*P3[2] ;
 		z_h = (z_h-int(z_h) >= 0.5) ? ceil(z_h) : floor(z_h) ;
 		z_b = (z_b-int(z_b) >= 0.5) ? ceil(z_b) : floor(z_b) ;
 
-		line(image, x,y_h,z_h, TGAColor((1-t1)*color1.val+t1*color2.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
+		line(image, x,y_h,z_h, tex1*(1-t1)+tex2*t1,x,y_b,z_b, tex1*(1-t2)+tex3*t2) ;
 	}
-	for(int x = x2; x<=x3; x++){
-		t1 = (x3==x2) ? 1 : (x-x2)/(float)(x3-x2) ;
-		t2 = (x3==x1) ? 1 : (x-x1)/(float)(x3-x1) ;
-		y_h = (1.-t1)*y2 + t1*y3 ;
-		y_b = (1.-t2)*y1 + t2*y3 ;
+	for(int x = P2[0]; x<=P3[0]; x++){
+		t1 = (P3[0]==P2[0]) ? 1 : (x-P2[0])/(float)(P3[0]-P2[0]) ;
+		t2 = (P3[0]==P1[0]) ? 1 : (x-P1[0])/(float)(P3[0]-P1[0]) ;
+		y_h = (1.-t1)*P2[1] + t1*P3[1] ;
+		y_b = (1.-t2)*P1[1] + t2*P3[1] ;
 		y_h = (y_h-int(y_h) >= 0.5) ? ceil(y_h) : floor(y_h) ;
 		y_b = (y_b-int(y_b) >= 0.5) ? ceil(y_b) : floor(y_b) ;
-		z_h = (1.-t1)*z2 + t1*z3 ;
-		z_b = (1.-t2)*z1 + t2*z3 ;
+		z_h = (1.-t1)*P2[2] + t1*P3[2] ;
+		z_b = (1.-t2)*P1[2] + t2*P3[2] ;
 		z_h = (z_h-int(z_h) >= 0.5) ? ceil(z_h) : floor(z_h) ;
 		z_b = (z_b-int(z_b) >= 0.5) ? ceil(z_b) : floor(z_b) ;
 
-		line(image, x,y_h,z_h, TGAColor((1-t1)*color2.val+t1*color3.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
+		line(image, x,y_h,z_h, tex2*(1-t1)+tex3*t1,x,y_b,z_b, tex1*(1-t2)+tex3*t2) ;
 	}
 }
 
@@ -195,37 +195,26 @@ void createImage(){
 		zbuffer[i] = new float[w] ;
 		for(int j =0; j<w; j++) zbuffer[i][j] = -1000000 ;
 	}
-	float x1,x2,x3,y1,y2,y3,z1,z2,z3, scalaire1,scalaire2,scalaire3,affich ;
+    Vec3f P1,P2,P3,T1,T2,T3 ;
 	for(int i = 0; i<facets.size();i++){
-		// Zoom + Translation
-		x1 = sommets[facets[i][0][0]-1][0] ;
-		y1 = sommets[facets[i][0][0]-1][1];
-		z1 = sommets[facets[i][0][0]-1][2];
-		x2 = sommets[facets[i][1][0]-1][0];
-		y2 = sommets[facets[i][1][0]-1][1];
-		z2 = sommets[facets[i][1][0]-1][2];
-		x3 = sommets[facets[i][2][0]-1][0];
-		y3 = sommets[facets[i][2][0]-1][1];
-		z3 = sommets[facets[i][2][0]-1][2];
-		Vec3f n1(normaux[facets[i][0][2]-1]) ;
-		Vec3f n2(normaux[facets[i][1][2]-1]) ;
-		Vec3f n3(normaux[facets[i][2][2]-1]) ;
-		n1 = n1.normalize() ;
-		n2 = n2.normalize() ;
-		n3 = n3.normalize() ;
-		lumiere = lumiere.normalize() ;
-		//	Coloration
-		scalaire1 = max(lumiere * n1, 0.f);
-		scalaire2 = max(lumiere * n2, 0.f);
-		scalaire3 = max(lumiere * n3, 0.f);
-		triangle(im, x1,y1,z1, TGAColor(scalaire1*255,1),x2,y2,z2, TGAColor(scalaire2*255,1),x3,y3,z3, TGAColor(scalaire3*255,1)) ;
+        P1 = Vec3f(sommets[facets[i][0][0]-1]) ;
+		P2 = Vec3f(sommets[facets[i][1][0]-1]) ;
+		P3 = Vec3f(sommets[facets[i][2][0]-1]) ;
+		T1 = Vec3f(textures[facets[i][0][1]-1]) ;
+        T2 = Vec3f(textures[facets[i][1][1]-1]) ;
+        T3 = Vec3f(textures[facets[i][2][1]-1]) ;
+		
+		triangle(im, P1, T1, P2, T2, P3, T3) ;
 	}
 	im.flip_vertically() ;
-	im.write_tga_file("ombrage_lisse.tga") ;
+	im.write_tga_file("relief.tga") ;
 }
 
 int main(int argc, char** argv){
-	readFile("obj/african_head.obj") ;
+	string path = "obj/african_head.obj" ;
+	readFile(path.c_str()) ;
+	nm.read_tga_file((path.substr(0,path.length()-4)+"_nm.tga").c_str()) ;
+	nm.flip_vertically() ;
 	zbuffer = new float*[w] ;
 	viewport(0,0,w,w) ;
 	lookat(cam, u, center) ;
