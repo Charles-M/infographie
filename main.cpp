@@ -110,26 +110,52 @@ void triangle(TGAImage &image, int x1, int y1, int x2, int y2, int x3, int y3, T
 	}
 }
 
+struct Vec3f {
+  union {
+    struct {float x, y, z;};
+    float raw[3];
+  };
+  Vec3f() : x(0), y(0), z(0) {}
+  Vec3f(float _x, float _y, float _z) : x(_x),y(_y),z(_z) {}
+  Vec3f(vector<float> tab) : x(tab[0]),y(tab[1]),z(tab[2]) {}
+  Vec3f operator ^(const Vec3f &v) const { return Vec3f(y*v.z-z*v.y, z*v.x-x*v.z, x*v.y-y*v.x); }
+  Vec3f operator +(const Vec3f &v) const { return Vec3f(x+v.x, y+v.y, z+v.z); }
+  Vec3f operator -(const Vec3f &v) const { return Vec3f(x-v.x, y-v.y, z-v.z); }
+  Vec3f operator *(float f) const { return Vec3f(x*f, y*f, z*f); }
+  float operator *(const Vec3f &v) const { return x*v.x + y*v.y + z*v.z; }
+  float norm () const { return std::sqrt(x*x+y*y+z*z); }
+  Vec3f & normalize(float l=1) { *this = (*this)*(l/norm()); return *this; }
+};
+
 int main(int argc, char** argv){
 	readFile("obj/african_head.obj") ;
 	int w = 1000 ;
 	TGAImage im = TGAImage(w,w,1) ;
 	TGAColor blanc = TGAColor(255, 255, 255, 3) ;
-	int x1,x2,x3,y1,y2,y3, zoom = w/2 ;
+	Vec3f lum(0,0,1) ;
+	float x1,x2,x3,y1,y2,y3,z1,z2,z3, scalaire, zoom = w/2 ;
 	for(int i = 0; i<facets.size();i++){
 		// Zoom + Translation
-		x1 = zoom*(sommets[facets[i][0][0]-1][0])+w/2 ;
-		y1 = zoom*(sommets[facets[i][0][0]-1][1])+w/2 ;
-		x2 = zoom*(sommets[facets[i][1][0]-1][0])+w/2 ;
-		y2 = zoom*(sommets[facets[i][1][0]-1][1])+w/2 ;
-		x3 = zoom*(sommets[facets[i][2][0]-1][0])+w/2 ;
-		y3 = zoom*(sommets[facets[i][2][0]-1][1])+w/2 ;
+		x1 = zoom*(sommets[facets[i][0][0]-1][0]) + w/2 ;
+		y1 = zoom*(sommets[facets[i][0][0]-1][1]) + w/2 ;
+		z1 = zoom*(sommets[facets[i][0][0]-1][2]) + w/2 ;
+		x2 = zoom*(sommets[facets[i][1][0]-1][0]) + w/2 ;
+		y2 = zoom*(sommets[facets[i][1][0]-1][1]) + w/2 ;
+		z2 = zoom*(sommets[facets[i][1][0]-1][2]) + w/2 ;
+		x3 = zoom*(sommets[facets[i][2][0]-1][0]) + w/2 ;
+		y3 = zoom*(sommets[facets[i][2][0]-1][1]) + w/2 ;
+		z3 = zoom*(sommets[facets[i][2][0]-1][2]) + w/2 ;
+		Vec3f a(x1,y1,z1) ;
+		Vec3f b(x2,y2,z2) ;
+		Vec3f c(x3,y3,z3) ;
+		Vec3f n = (a-b)^(a-c);
+		n = n.normalize() ;
+		scalaire = n*lum ;
 		// Affichage
-		line(im, x1,y1,x2,y2, blanc) ;
-		line(im, x1,y1,x3,y3, blanc) ;
-		line(im, x2,y2,x3,y3, blanc) ;
+		if(scalaire > 0)
+			triangle(im, x1,y1,x2,y2,x3,y3, TGAColor(scalaire*255, 1)) ;
 	}
 	im.flip_vertically() ;
-	im.write_tga_file("wire.tga") ;
+	im.write_tga_file("ombrage_plat.tga") ;
 	return 0 ;
 }
