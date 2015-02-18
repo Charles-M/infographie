@@ -9,6 +9,19 @@
 
 using namespace std;
 
+// CHAMPS
+std::vector<Vec3f > sommets;
+std::vector<Vec3f > textures;
+std::vector<Vec3f > normaux;
+std::vector<std::vector<Vec3i> > facets;
+Vec3f lumiere = Vec3f(1,1,1) ;
+Vec3f cam = Vec3f(0,0,1) ;
+Vec3f center = Vec3f(0,0,0) ;
+Vec3f u = Vec3f(0,1,0) ;
+Matrix view, projection, changementBase, M, M_inv;
+int ** zbuffer = NULL ; int maxi = 0 ;
+const int w = 1000 ;
+
 // PROTOTYPE
 void readFile(string path) ;
 void viewport(float taille) ;
@@ -18,19 +31,6 @@ void transform() ;
 void createImage() ;
 void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2) ;
 void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int y2, int z2, TGAColor color2, int x3, int y3, int z3, TGAColor color3) ;
-
-// CHAMPS
-std::vector<Vec3f > sommets;
-std::vector<Vec3f > textures;
-std::vector<Vec3f > normaux;
-std::vector<std::vector<Vec3i> > facets;
-Vec3f lumiere = Vec3f(0,0,1) ;
-Vec3f cam = Vec3f(1,1,1) ;
-Vec3f center = Vec3f(0,0,0) ;
-Vec3f u = Vec3f(0.f,1.f,0.f) ;
-Matrix view, projection, changementBase, M, M_inv;
-int ** zbuffer = NULL ; int maxi = 0 ;
-const int w = 1000 ;
 
 void readFile(string path) {
 	ifstream fichier(path.c_str()) ;
@@ -61,10 +61,14 @@ void readFile(string path) {
     } else cout << "Erreur lors de la lecture du fichier obj" << endl ;
 }
 
-void viewport(float taille) {
-	view = Matrix::identity() ;
-	view[0][3] = view[1][3] = view[2][3] = taille/2.f ;
-	view[0][0] = view[1][1] = view[2][2] = taille/2.f ;
+void viewport(int x, int y, int w, int h) {
+	view = Matrix::identity();
+	view[0][3] = x+w/2.f;
+	view[1][3] = y+h/2.f;
+	view[2][3] = 1.f;
+	view[0][0] = w/2.f;
+	view[1][1] = h/2.f;
+	view[2][2] = 0;
 }
 
 void project(float coeff){
@@ -97,7 +101,7 @@ void createImage(){
 	TGAImage im = TGAImage(w,w,1) ;
 	for(int i = 0; i<w; i++){
 		zbuffer[i] = new int[w] ;
-		for(int j =0; j<w; j++) zbuffer[i][j] = 0 ;
+		for(int j =0; j<w; j++) zbuffer[i][j] = -1000000 ;
 	}
 	float x1,x2,x3,y1,y2,y3,z1,z2,z3, scalaire1,scalaire2,scalaire3,moyenne ;
 	for(int i = 0; i<facets.size();i++){
@@ -117,10 +121,11 @@ void createImage(){
 		n1 = n1.normalize() ;
 		n2 = n2.normalize() ;
 		n3 = n3.normalize() ;
+		lumiere = lumiere.normalize() ;
 		//	Coloration
-		scalaire1 = min(max(lumiere * n1, 0.f), 1.f);
-		scalaire2 = min(max(lumiere * n2, 0.f), 1.f);
-		scalaire3 = min(max(lumiere * n3, 0.f), 1.f);
+		scalaire1 = max(lumiere * n1, 0.f);
+		scalaire2 = max(lumiere * n2, 0.f);
+		scalaire3 = max(lumiere * n3, 0.f);
 		moyenne = (scalaire1+scalaire2+scalaire3)/3 ;
 		if(moyenne > 0)
 			 triangle(im, x1,y1,z1, TGAColor(scalaire1*255,1),x2,y2,z2, TGAColor(scalaire2*255,1),x3,y3,z3, TGAColor(scalaire3*255,1)) ;
@@ -149,6 +154,8 @@ void line(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, int 
 		t = (x2==x1) ? 1 : (x-x1)/(float)(x2-x1) ;
 		y = (1-t)*y1 + t*y2 ;
 		z = (1-t)*z1 + t*z2 ;
+		y = (y-int(y) >= 0.5) ? ceil(y) : floor(y) ;
+		z = (z-int(z) >= 0.5) ? ceil(z) : floor(z) ;
 
 		color.val = (1-t)*color1.val + t*color2.val ;
 		if(pentu){
@@ -192,8 +199,12 @@ void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, 
 		t2 = (x3==x1) ? 1 : (x-x1)/(float)(x3-x1) ;
 		y_h = (1.-t1)*y1 + t1*y2 ;
 		y_b = (1.-t2)*y1 + t2*y3 ;
+		y_h = (y_h-int(y_h) >= 0.5) ? ceil(y_h) : floor(y_h) ;
+		y_b = (y_b-int(y_b) >= 0.5) ? ceil(y_b) : floor(y_b) ;
 		z_h = (1.-t1)*z1 + t1*z2 ;
 		z_b = (1.-t2)*z1 + t2*z3 ;
+		z_h = (z_h-int(z_h) >= 0.5) ? ceil(z_h) : floor(z_h) ;
+		z_b = (z_b-int(z_b) >= 0.5) ? ceil(z_b) : floor(z_b) ;
 
 		line(image, x,y_h,z_h, TGAColor((1-t1)*color1.val+t1*color2.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
 	}
@@ -202,8 +213,12 @@ void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, 
 		t2 = (x3==x1) ? 1 : (x-x1)/(float)(x3-x1) ;
 		y_h = (1.-t1)*y2 + t1*y3 ;
 		y_b = (1.-t2)*y1 + t2*y3 ;
+		y_h = (y_h-int(y_h) >= 0.5) ? ceil(y_h) : floor(y_h) ;
+		y_b = (y_b-int(y_b) >= 0.5) ? ceil(y_b) : floor(y_b) ;
 		z_h = (1.-t1)*z2 + t1*z3 ;
 		z_b = (1.-t2)*z1 + t2*z3 ;
+		z_h = (z_h-int(z_h) >= 0.5) ? ceil(z_h) : floor(z_h) ;
+		z_b = (z_b-int(z_b) >= 0.5) ? ceil(z_b) : floor(z_b) ;
 
 		line(image, x,y_h,z_h, TGAColor((1-t1)*color2.val+t1*color3.val, 1),x,y_b,z_b, TGAColor((1-t2)*color1.val+t2*color3.val, 1)) ;
 	}
@@ -212,11 +227,12 @@ void triangle(TGAImage &image, int x1, int y1, int z1, TGAColor color1, int x2, 
 int main(int argc, char** argv){
 	readFile("obj/african_head.obj") ;
 	zbuffer = new int*[w] ;
-	viewport(w) ;
+	viewport(0,0,w,w) ;
 	lookat(cam, u, center) ;
-	project(0.f) ;
+	project(0) ;
 	M = view*projection*changementBase ;
 	M_inv = (projection*changementBase).invert_transpose() ;
+	
 	transform() ;
 	createImage() ;
 	return 0 ;
