@@ -21,7 +21,7 @@ Vec3f u = Vec3f(0,1,0) ;
 Matrix view, projection, changementBase, M, M_inv;
 float ** zbuffer = NULL ; int maxi = 0 ;
 const int w = 1000 ;
-TGAImage nm ;
+TGAImage nm, diffuse ;
 
 // PROTOTYPE
 void readFile(string path) ;
@@ -115,10 +115,12 @@ void line(TGAImage &image, int x1, int y1, int z1, Vec3f tex1, int x2, int y2, i
 		y_tex = ((1-t)*tex1[1] + t*tex2[1])*nm.get_height() ;
 		
 		TGAColor colorNm = nm.get(x_tex, y_tex) ;
+		TGAColor colorDiffuse = diffuse.get(x_tex, y_tex) ;
 		Vec3f l = lumiere.normalize() ;
 		Vec3f n = proj<3>(M_inv*embed<4>(Vec3f(colorNm.r/255.f*2.f-1.f,colorNm.g/255.f*2.f-1.f,colorNm.b/255.f*2.f-1.f), 0.f)).normalize() ;
 		float diff = max(0.f,n*l) ;
-		color = TGAColor(255,1)*diff;
+		color = colorDiffuse*diff+10;
+		
 		if(pentu){
 			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[(int)y][x] < z){
 				zbuffer[(int)y][x] = z ;
@@ -190,7 +192,7 @@ void transform() {
 }
 
 void createImage(){
-	TGAImage im = TGAImage(w,w,1) ;
+	TGAImage im = TGAImage(w,w,3) ;
 	for(int i = 0; i<w; i++){
 		zbuffer[i] = new float[w] ;
 		for(int j =0; j<w; j++) zbuffer[i][j] = -1000000 ;
@@ -215,6 +217,8 @@ int main(int argc, char** argv){
 	readFile(path.c_str()) ;
 	nm.read_tga_file((path.substr(0,path.length()-4)+"_nm.tga").c_str()) ;
 	nm.flip_vertically() ;
+	diffuse.read_tga_file((path.substr(0,path.length()-4)+"_diffuse.tga").c_str()) ;
+	diffuse.flip_vertically() ;
 	zbuffer = new float*[w] ;
 	viewport(0,0,w,w) ;
 	lookat(cam, u, center) ;
