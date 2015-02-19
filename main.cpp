@@ -95,17 +95,12 @@ void lookat(Vec3f eye, Vec3f up, Vec3f centre) {
 }
 
 void line(TGAImage &image, int x1, int y1, int z1, Vec3f tex1, int x2, int y2, int z2, Vec3f tex2){
-	float t, y, z ;
+	float t, y, z, s, spe, diff, shad ;
     int x_tex, y_tex ;
 	bool pentu = false ;
-	TGAColor color(0, 1) ;
+	TGAColor color ;
 	
-	Vec4f p1_shad = trans*embed<4>(Vec3f(x1,y1,z1)) ;
-	p1_shad = p1_shad/p1_shad[3] ;
-	Vec4f p2_shad = trans*embed<4>(Vec3f(x2,y2,z2)) ;
-	p2_shad = p2_shad/p2_shad[3] ;
-	
-	if((pentu = abs(y2-y1)>abs(x2-x1))){
+	if((pentu = abs(y2-y1)>=abs(x2-x1))){
 		swap(x1,y1) ;
 		swap(x2,y2) ;
 	}
@@ -119,48 +114,37 @@ void line(TGAImage &image, int x1, int y1, int z1, Vec3f tex1, int x2, int y2, i
 		t = (x2==x1) ? 1 : (x-x1)/(float)(x2-x1) ;
 		y = (1-t)*y1 + t*y2 ;
 		z = (1-t)*z1 + t*z2 ;
-		x_tex = ((1-t)*tex1[0] + t*tex2[0])*nm.get_width() ;
-		y_tex = ((1-t)*tex1[1] + t*tex2[1])*nm.get_height() ;
 		
 		if(!ombre){
+			x_tex = ((1-t)*tex1[0] + t*tex2[0])*nm.get_width() ;
+			y_tex = ((1-t)*tex1[1] + t*tex2[1])*nm.get_height() ;
 			TGAColor colorNm = nm.get(x_tex, y_tex) ;
 			TGAColor colorDiffuse = diffuse.get(x_tex, y_tex) ;
 			TGAColor colorSpec = specular.get(x_tex, y_tex) ;
 			Vec3f l = lumiere.normalize() ;
 			Vec3f n = proj<3>(M_inv*embed<4>(Vec3f(colorNm.r/255.f*2.f-1.f,colorNm.g/255.f*2.f-1.f,colorNm.b/255.f*2.f-1.f), 0.f)).normalize() ;
 			Vec3f r = ((n*2.*(n*l))-l).normalize() ;
-			float s = std::max(0.f,r*cam.normalize()) ;
-			float diff = std::max(0.f,n*l) ;
-			float spe = std::sqrt(colorSpec.r*colorSpec.r+colorSpec.g*colorSpec.g+colorSpec.b*colorSpec.b) ;
+			s = std::max(0.f,r*cam.normalize()) ;
+			diff = std::max(0.f,n*l) ;
+			spe = std::sqrt(colorSpec.r*colorSpec.r+colorSpec.g*colorSpec.g+colorSpec.b*colorSpec.b) ;
 			color = colorDiffuse*(1.2*diff+.6*pow(s, spe+5));
-		}
-		Vec4f p_shad = trans*embed<4>(Vec3f((float)x,y,z)) ;
-		p_shad = p_shad/p_shad[3] ;
-		bool ok = p_shad[0] < 1000 && p_shad[0] >= 0 && p_shad[1] < 1000 && p_shad[1] >= 0 ;
-		float shad = 1 ;
-		if(ok && !ombre){
-			if(abs(p2_shad[1]-p1_shad[1]) > abs(p2_shad[0]-p1_shad[0]))
-				shad = .3+.7*(ombre_buff[(int)p_shad[1]][(int)p_shad[0]]<p_shad[2]+42) ;
-			else
+			Vec4f p_shad = trans*embed<4>(Vec3f((float)y,x,z)) ;
+			p_shad = p_shad/p_shad[3] ;
+			shad = 1 ;
+			if(p_shad[0] < 1000 && p_shad[0] >= 0 && p_shad[1] < 1000 && p_shad[1] >= 0)
 				shad = .3+.7*(ombre_buff[(int)p_shad[0]][(int)p_shad[1]]<p_shad[2]+42) ;
 		}
 		if(pentu){
-			if(ombre && x>0 && y>0 && x<(w-1) && y<(w-1) && ombre_buff[(int)y][x] < z)
+			if(ombre && x>0 && y>0 && x<(w-1) && y<(w-1) && ombre_buff[(int)y][x] < z){
 				ombre_buff[(int)y][x] = z ;
-			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[(int)y][x] < z){
+				if(maxi < z) maxi = z ;
+				if(mini > z) mini = z ;
+			}
+			if(!ombre && x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[(int)y][x] < z){
 				zbuffer[(int)y][x] = z ;
 				if(maxi < z) maxi = z ;
 				if(mini > z) mini = z ;
 				image.set(y,x,color*shad) ;
-			}
-		}else{
-			if(ombre && x>0 && y>0 && x<(w-1) && y<(w-1) && ombre_buff[x][(int)y] < z)
-				ombre_buff[x][(int)y] = z ;
-			if(x>0 && y>0 && x<(w-1) && y<(w-1) && zbuffer[x][(int)y] < z){
-				zbuffer[x][(int)y] = z ;
-				if(maxi < z) maxi = z ;
-				if(mini > z) mini = z ;
-				image.set(x,y,color*shad) ;
 			}
 		}
 	}
@@ -267,7 +251,7 @@ int main(int argc, char** argv){
 	for(int i = 0; i<w; i++){
 		for(int j =0; j<w; j++){
 			int couleur = (ombre_buff[i][j]+abs(mini))*255/(maxi+abs(mini)) ;
-			buff.set(i,j,TGAColor(couleur,1)) ;
+			buff.set(i,j,TGAColor(max(0,couleur),1)) ;
 		}
 	}
 	buff.flip_vertically() ;
