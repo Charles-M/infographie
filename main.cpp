@@ -145,7 +145,7 @@ void line(TGAImage &image, int x1, int y1, int z1, Vec3f n1, Vec3f tex1, int x2,
 			s = std::max(0.f,r*cam.normalize()) ;
 			diff = std::max(0.f,n*l) ;
 			spe = std::sqrt(colorSpec.r*colorSpec.r+colorSpec.g*colorSpec.g+colorSpec.b*colorSpec.b) ;
-			color = TGAColor(255,255,255,3)*(1.2*diff+.6*pow(s, spe+5));
+			color = colorDiffuse*(1.2*diff+.6*pow(s, spe+5));
 			Vec4f p_shad = trans*embed<4>(Vec3f((float)y,x,z)) ;
 			p_shad = p_shad/p_shad[3] ;
 			shad = 1 ;
@@ -167,7 +167,7 @@ void line(TGAImage &image, int x1, int y1, int z1, Vec3f n1, Vec3f tex1, int x2,
 				zbuffer[(int)y][x] = z ;
 				if(maxi < z) maxi = z ;
 				if(mini > z) mini = z ;
-				image.set(y,x,color*1) ;
+				image.set(y,x,color*shad) ;
 			}
 		}
 	}
@@ -259,7 +259,7 @@ void createImage(){
 }
 
 int main(int argc, char** argv){
-	string path = "obj/diablo3_pose.obj" ;
+	string path = "obj/african_head.obj" ;
 	readFile(path.c_str()) ;
 	nm.read_tga_file((path.substr(0,path.length()-4)+"_nm.tga").c_str()) ;
 	nm.flip_vertically() ;
